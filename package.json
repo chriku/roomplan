@@ -1,0 +1,45 @@
+{
+  "name": "roomplan",
+  "version": "1.0.0",
+  "description": "DS1 Roomplan (2025/2026 33)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "run": "npm run build && npm run start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "y"
+  },
+  "author": "Pascal Schur, Axel ?, Christian Kurz",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "prettier": "^3.7.4",
+    "typescript": "^5.9.3"
+  },
+  "prettier": {
+    "tabWidth": 4,
+    "trailingComma": "none",
+    "printWidth": 120,
+    "overrides": [
+      {
+        "files": [
+          "*.md",
+          "*.yml",
+          "*.yaml"
+        ],
+        "options": {
+          "tabWidth": 2
+        }
+      }
+    ]
+  },
+  "dependencies": {
+    "pretty-repl": "^4.0.1"
+  }
+}

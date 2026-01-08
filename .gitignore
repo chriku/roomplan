@@ -1,0 +1,8 @@
+node_modules/
+dist/
+**/lib/
+**/.rollup.cache/
+*.tsbuildinfo
+# debug files
+**/test.ts
+.idea/
