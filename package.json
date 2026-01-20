@@ -15,10 +15,11 @@
     "type": "git",
     "url": "y"
   },
-  "author": "Pascal Schur, Axel ?, Christian Kurz",
+  "author": "Pascal Schur, Axel Körner, Christian Kurz",
   "license": "MIT",
   "type": "module",
   "devDependencies": {
+    "@types/node": "^25.0.9",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3"
   },
@@ -40,6 +41,7 @@
     ]
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
     "pretty-repl": "^4.0.1"
   }
 }
