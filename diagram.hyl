@@ -1,0 +1,197 @@
+classDiagram(defaultLineType = "line") {
+    class("NetworkLayer") {
+        public {
+            /*multicast(message : Message)
+            direct(receiver : UUID, message : Message)
+            receive() : "Promise<Message>"*/
+        }
+    } layout {
+        pos = apos(2000, -200)
+    }
+    class("ReliableOrderedNetworkLayer") {
+        public {
+            multicast(message : Message)
+            receive() : "Promise<Message>"
+        }
+    } layout {
+        pos = apos(2000, 0)
+    }
+    ReliableOrderedNetworkLayer extends NetworkLayer with {
+        over = start(0.75).line(end(0.25))
+    }
+    class("OperationManager") {
+        public {
+            proposeOperation(operation : Operation)
+        }
+    } layout {
+        pos = apos(1600, -100)
+    }
+    class("LeaderElectorate") {
+    } layout {
+        pos = apos(1500, 0)
+    }
+    OperationManager extends LeaderElectorate with {
+        over = start(0.3).line(end(0.75))
+    }
+    class("ConsensusVote") {
+        public {
+            vote(operation : Operation) : boolean
+        }
+    } layout {
+        pos = apos(1600, -200)
+    }
+    OperationManager extends ConsensusVote with {
+        over = start(0.75).line(end(0.25))
+    }
+    class("Operation") {
+        private {
+            id : UUID
+        }
+        public {
+            sequenceNumber : Int
+            timestamp : Date
+        }
+    } layout {
+        pos = apos(1500, 300)
+    }
+    class("BookRoomOperation") {
+        public {
+            dateRange : DateRange
+        }
+    } layout {
+        pos = apos(1500, 500)
+    }
+    BookRoomOperation extends Operation with {
+        over = start(0.75).line(end(0.25))
+    }
+    class("CancelRoomOperation") {
+        public {
+            booking : Booking
+        }
+    } layout {
+        pos = apos(1500, 100)
+    }
+    CancelRoomOperation extends Operation with {
+        over = start(0.25).line(end(0.75))
+    }
+    class("Node") {
+        private {
+            id : UUID
+        }
+    } layout {
+        pos = apos(2000, 300)
+    }
+    Operation -- Node with {
+        label("operations", 0.2, 0)
+        label("0..*", 0.1, 20)
+        label("causedBy", 0.8, 0)
+        label("1", 0.95, 20)
+    }
+    class("State") {  } layout {
+        pos = apos(1000, -100)
+    }
+    class("Room") {
+        private {
+            id : string
+        }
+        public {
+            capacity : Int
+        }
+    } layout {
+        pos = apos(1000, 100)
+    }
+    BookRoomOperation -- Room with {
+        label("room", 1, 20)
+        label("1", 1, -20)
+        over = start(0.6).line(end(0.1))
+    }
+    LeaderElectorate .. Node with {
+        label("currentLeader", 0.85, -30)
+        label("0..1", 0.95, -10)
+        /*label("annointedBy", -0.05, -40)
+        label("0..1", 0, 20)*/
+        over = start(0.1).line(end(0.6))
+    }
+    State -- Room with {
+        label("0..*", 0.85, 20)
+        label("rooms", 0.85, -30)
+        over = start(0.25).line(end(0.75))
+    }
+    enum("BookingStatus") {
+        default {
+            BOOKED
+            CANCELLED
+        }
+    } layout {
+        pos = apos(1000, -200)
+    }
+    class("Booking") {
+        private {
+            id : UUID
+        }
+        public {
+            dateRange : DateRange
+            status : BookingStatus
+        }
+    } layout {
+        pos = apos(1000, 300)
+    }
+    Booking -- Room with {
+        label("bookings", 0.2, 40)
+        label("0..*", 0.2, -20)
+        label("room", 1, 20)
+        label("1", 1, -10)
+        over = start(0.75).line(end(0.25))
+    }
+    State extends OperationManager with {
+        over = start(0).line(end(0.5))
+    }
+    class("NetworkManager") layout {
+        pos = apos(2000, 200)
+    }
+    NetworkManager .. ReliableOrderedNetworkLayer with {
+        /*label("networkManager", 0.15, -70)
+        label("reliableOrderedNetworkLayer", 1, -110)
+        label("1", 0.15, 10)
+        label("1", 1, 10)*/
+        label("via singletons", 0.5)
+        over = start(0.75).line(end(0.25))
+    }
+    NetworkManager -- Node with {
+        label("networkManager", 0, -140)
+        label("1", 0, -20)
+        label("knownNodes", 0.65, -50)
+        label("0..*", 0.65, 20)
+        over = start(0.15).line(end(0.85))
+    }
+    NetworkManager -- Node with {
+        label("activeNodes", 0.65, 50)
+        label("0..*", 0.45, 20)
+        over = start(0.35).line(end(0.65))
+    }
+    NetworkManager .. OperationManager with {
+        label("networkManager", 0.05, -70)
+        label("1", 0)
+        label("operationManager", 1.05, 70)
+        label("1", 1, -20)
+        over = start(0.6).line(end(0.1))
+        label("via singletons", 0.5)
+    }
+    class("User") {
+        private {
+            name : String
+        }
+    } layout {
+        pos = apos(1000, 500)
+    }
+    Booking -- User with {
+        label("1", 0.8, 10)
+        label("bookedBy", 0.85, -40)
+        over = start(0.25).line(end(0.75))
+    }
+    BookRoomOperation -- User with {
+        label("user", 0.9, 0)
+        label("1", 0.9, 0)
+        over = start(0.5).line(end(0))
+    }
+}
