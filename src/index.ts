@@ -5,8 +5,5 @@ const options = {
     prompt: '→ '
 };
 
-// repl.start(options);
-
-const netLayer = new NetworkLayer();
-
-
+const replInstance = repl.start(options);
+replInstance.context.netLayerTest = () => new NetworkLayer();
