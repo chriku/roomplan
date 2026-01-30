@@ -5,4 +5,4 @@ const options = {
 };
 
 const replInstance = repl.start(options);
-replInstance.context.netLayerTest = () => new NetworkLayer();
+// replInstance.context.netLayerTest = () => new NetworkLayer(); <== commented out until @schurpl merged
