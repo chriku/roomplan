@@ -1,5 +1,4 @@
-import type { OperationManager } from "./operation_manager.js";
-
+import { Node } from "./node.js";
 export abstract class NetworkManager {
     static singleton: NetworkManager | null = null;
 

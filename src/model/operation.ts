@@ -3,6 +3,7 @@ import type { Booking } from './booking.js';
 import type { Room } from './room.js';
 import type { DateRange } from './date_range.js';
 import type { User } from './user.js';
+import type { Node } from './node.js';
 
 export class Operation {
     public causedBy: Node | null = null;
