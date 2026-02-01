@@ -73,7 +73,6 @@ export class NetworkManager extends AbstractNetworkManager {
 
         this.messageState.set(msg.id, tracker);
 
-        // Falls wir die einzige Node im System sind, sofort finalisieren
         if (otherNodes.length === 0) {
             this.finalizeMessage(msg);
             return;
