@@ -14,7 +14,7 @@ export class ConcreteNetworkLayer extends NetworkLayer {
     private socket: dgram.Socket;
     private multicastAddress: string;
     private multicastPort: number;
-    private pendingReceivers: ((msg: ProtocolMessage) => void)[] = [];
+
 
     constructor() {
         super();
@@ -33,11 +33,12 @@ export class ConcreteNetworkLayer extends NetworkLayer {
         return new Promise((resolve, reject) => {
             this.socket.send(data, this.multicastPort, this.multicastAddress, (err) => {
                 if (err) return reject(err);
+                //PASS Massage to the Network Manager
                 resolve();
             });
         });
     }
-    
+
       private setupListeners() {
         this.socket.on('error', (err) => {
             console.error(`server error:\n${err.stack}`);
@@ -50,11 +51,8 @@ export class ConcreteNetworkLayer extends NetworkLayer {
             try {
                 const parsed: ProtocolMessage = JSON.parse(msg.toString());
                 
-                // If someone is waiting for a message, give it to them
-                if (this.pendingReceivers.length > 0) {
-                    const resolve = this.pendingReceivers.shift();
-                    if (resolve) resolve(parsed);
-                }
+               // ADD Massage to network Manager 
+               
             } catch (e) {
                 console.error("Failed to parse message", e);
             }
