@@ -17,7 +17,9 @@ export class Room {
     listBookings() {
         console.log("Bookings for " + this.name);
         for (const booking of this.bookings) {
-            console.log("  Booking " + booking.id + ": From " + booking.time.startTime + " to " + booking.time.endTime + " by " + booking.user.name);
+            if (booking.valid) {
+                console.log("  Booking " + booking.id + ": From " + booking.time.startTime + " to " + booking.time.endTime + " by " + booking.user.name);
+            }
         }
     }
 }
