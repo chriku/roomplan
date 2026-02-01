@@ -13,6 +13,8 @@ import type {
 } from "./messages.js";
 
 export abstract class OperationManager extends State {
+    public static singleton: OperationManager | null = null;
+
     private readonly self: Node;
     private readonly networkLayer: NetworkLayer;
     private readonly networkManager: NetworkManager;
