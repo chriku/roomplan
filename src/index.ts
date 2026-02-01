@@ -1,4 +1,5 @@
 import repl from "pretty-repl";
+import { Room } from "./model/room.js";
 
 const options = {
     prompt: '→ '
