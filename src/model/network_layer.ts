@@ -3,13 +3,13 @@ import * as dgram from 'node:dgram';
 
 export type Message = { type: string };
 export type FischMessage = { type: "fisch", data: string };
-export abstract class NetworkLayer {
+export abstract class AbstractNetworkLayer {
     static singleton: NetworkLayer | null = null;
 
     abstract multicast(message: ProtocolMessage): Promise<void>;
 
 }
-export class ConcreteNetworkLayer extends NetworkLayer {
+export class NetworkLayer extends AbstractNetworkLayer {
     
     private socket: dgram.Socket;
     private multicastAddress: string;
@@ -33,7 +33,6 @@ export class ConcreteNetworkLayer extends NetworkLayer {
         return new Promise((resolve, reject) => {
             this.socket.send(data, this.multicastPort, this.multicastAddress, (err) => {
                 if (err) return reject(err);
-                //PASS Massage to the Network Manager
                 resolve();
             });
         });
@@ -47,7 +46,6 @@ export class ConcreteNetworkLayer extends NetworkLayer {
 
         this.socket.on('message', (msg, rinfo) => {
             console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
-            //TODO send logic to upper layer
             try {
                 const parsed: ProtocolMessage = JSON.parse(msg.toString());
                 
