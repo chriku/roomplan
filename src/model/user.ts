@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import type { Room } from "./room.js";
 import { OperationManager } from "./operation_manager.js";
 import { BookRoomOperation } from "./operation.js";
@@ -14,6 +13,6 @@ export class User {
     }
     constructor(readonly name: string) { }
     bookRoom(room: Room, slot: number) {
-        OperationManager.singleton!.proposedOperation(new BookRoomOperation(lookupTimeSlot(slot), room, this));
+        OperationManager.singleton!.proposeOperation(new BookRoomOperation(lookupTimeSlot(slot), room, this));
     }
 }

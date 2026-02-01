@@ -24,12 +24,15 @@ export type PingMsg = BaseMsg<"PING">;
 export type AckMsg = BaseMsg<"ACK">;
 
 export type ElectionMsg = BaseMsg<"ELECTION">;
-export type OkMsg = BaseMsg<"OK">;
+export type OkMsg = BaseMsg<"OK"> & {
+    to: NodeId;
+};
 
 export type VoteRequestMsg = BaseMsg<"VOTE_REQUEST">;
 export type VoteResponseMsg = BaseMsg<"VOTE_RESPONSE"> & {
     lastDeliveredSeq: number;
     lastDeliveredOpId: string | null;
+    to: NodeId;
 };
 
 export type LeaderAnnounceMsg = BaseMsg<"LEADER_ANNOUNCE"> & {

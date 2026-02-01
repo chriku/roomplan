@@ -13,7 +13,7 @@ export function deleteBooking(uuid: string) {
         for (const booking of room.bookings) {
             if (booking.id == uuid) {
                 console.log("Deleting booking " + uuid + " from " + booking.time.startTime + " to " + booking.time.endTime + " in " + room.name);
-                OperationManager.singleton!.proposedOperation(new CancelRoomOperation(booking));
+                OperationManager.singleton!.proposeOperation(new CancelRoomOperation(booking));
                 return;
             }
         }

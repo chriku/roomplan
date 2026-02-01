@@ -1,4 +1,4 @@
-import type { Operation } from "./operation.js";
+import { BookRoomOperation, CancelRoomOperation, type Operation } from "./operation.js";
 import { State } from "./state.js";
 import { NetworkLayer } from "./network_layer.js";
 import { NetworkManager } from "./network_manager.js";
@@ -9,9 +9,11 @@ import type {
     NodeId,
     ProposeOperationMsg,
     ProtocolMessage,
+    ResendRequestMsg,
     VoteResponseMsg
 } from "./messages.js";
-
+import { Room } from "./room.js";
+import { Booking, BookingStatus } from "./booking.js";
 
 
 export class OperationManager extends State {
@@ -52,7 +54,6 @@ export class OperationManager extends State {
         this.networkManager = networkManager;
     }
 
-
     // propose operation from user point - handles leader election. Returns outcome
     proposeOperation(operation: Operation): string {
         operation.causedBy = this.self;
@@ -78,19 +79,10 @@ export class OperationManager extends State {
         return "FORWARDED_TO_LEADER";
     }
 
+    // return the current leader
     currentLeader(): Node | null {
         if (!this.leaderId) return null;
         return this.networkManager.knownNodes.find((node) => node.id === this.leaderId) ?? null;
-    }
-
-    private async sendToNode(toId: NodeId, msg: ProtocolMessage): Promise<void> {
-        //TODO unicast message
-    }
-
-    private async sendToMany(toIds: NodeId[], msgFactory: () => ProtocolMessage): Promise<void> {
-        for (const toId of toIds) {
-            await this.sendToNode(toId, msgFactory());
-        }
     }
 
     start(): void {
@@ -98,9 +90,13 @@ export class OperationManager extends State {
         if (!this.leaderId) this.startElection("startup");
     }
 
+    // receive loop that filters out false messages and acts according to the message kind
     private async receiveLoop(): Promise<void> {
         while (true) {
             const msg = (await this.networkLayer.receive()) as ProtocolMessage;
+
+            // Ignore messages which are not directed to us
+            if ("to" in msg && msg.to !== this.self.id) continue;
 
             // Epoch handling: ignore stale, adopt newer
             if (msg.epoch < this.currentEpoch) continue;
@@ -129,7 +125,7 @@ export class OperationManager extends State {
                     this.onAssignOp(msg);
                     break;
                 case "RESEND_REQUEST":
-                    // TODO if leader, resend; if follower ignore
+                    this.onResendRequest(msg);
                     break;
                 case "PING":
                 case "ACK":
@@ -187,9 +183,39 @@ export class OperationManager extends State {
         if (msg.from !== this.leaderId) return;
         if (this.deliveredOpIds.has(msg.op.id)) return;
 
+        if (msg.seq > this.nextSeqToDeliver) {
+            void this.networkLayer.multicast({
+                kind: "RESEND_REQUEST",
+                from: this.self.id,
+                epoch: this.currentEpoch,
+                leaderId: this.leaderId,
+                fromSeq: this.nextSeqToDeliver,
+                toSeq: msg.seq - 1
+            });
+        }
+
         this.pendingBySeq.set(msg.seq, msg.op);
         this.tryDeliverInOrder();
     }
+
+    private onResendRequest(msg: ResendRequestMsg): void {
+        if (this.mode !== "LEADER") return;
+        if (msg.leaderId !== this.self.id) return;
+
+        for (let seq = msg.fromSeq; seq <= msg.toSeq; seq++) {
+            const op = this.logBySeq.get(seq);
+            if (!op) continue;
+
+            void this.networkLayer.multicast({
+                kind: "ASSIGN_OP",
+                from: this.self.id,
+                leaderId: this.self.id,
+                epoch: this.currentEpoch,
+                seq,
+                op
+            });
+        }
+    };
 
     private tryDeliverInOrder(): void {
         while (this.pendingBySeq.has(this.nextSeqToDeliver)) {
@@ -199,9 +225,44 @@ export class OperationManager extends State {
             this.deliveredOpIds.add(op.id);
             this.logBySeq.set(this.nextSeqToDeliver, op);
 
-            // TODO: apply to state (rooms/bookings)
-
             this.nextSeqToDeliver++;
+
+            switch (op.kind) {
+                case "BOOK_ROOM":
+                    this.applyBooking(op as BookRoomOperation);
+                    return;
+                case "CANCEL_ROOM":
+                    this.applyCancel(op as CancelRoomOperation);
+                    return;
+            }
+        }
+    }
+
+    private applyBooking(op: BookRoomOperation) {
+        const oper = op as BookRoomOperation;
+        const room = Room.findRoom(oper.room.name);
+
+        if (!room) {
+            console.log("Room does not exist: " + oper.room.name);
+            return;
+        }
+
+        const booking = new Booking(room, oper.time, oper.user, BookingStatus.BOOKED, oper.id);
+        room.bookings.push(booking);
+        console.log("Room successfully booked: " + room.name);
+    }
+
+    private applyCancel(op: CancelRoomOperation) {
+        const oper = op as CancelRoomOperation;
+
+        for (const room of Object.values(Room.rooms)) {
+            const booking = room.bookings.find((b) => b.id === oper.id);
+            if (booking) {
+                booking.status = BookingStatus.CANCELLED;
+                return;
+            } else {
+                console.log("Room does not exist: " + oper.booking.room.name);
+            }
         }
     }
 
@@ -210,26 +271,35 @@ export class OperationManager extends State {
         this.mode = "CANDIDATE";
         this.clearTimers();
 
-        const higher = this.networkManager.activeNodes.filter((n) => n.id > this.self.id);
+        console.log("Starting election for: " + reason);
+
         const electionEpoch = this.currentEpoch + 1;
 
-        void this.sendToMany(
-            higher.map((n) => n.id),
-            () => ({ kind: "ELECTION", from: this.self.id, epoch: electionEpoch })
-        );
+        this.networkLayer.multicast({
+            kind: "ELECTION",
+            from: this.self.id,
+            epoch: electionEpoch
+        });
 
         this.electionTimer = setTimeout(() => {
             this.becomeCandidateLeader(electionEpoch);
         }, 600);
     }
 
+    // accept election with "Ok" if our id is higher than elected and start a new election.
     private onElection(fromId: string): void {
         if (fromId < this.self.id) {
-            void this.sendToNode(fromId, { kind: "OK", from: this.self.id, epoch: this.currentEpoch });
+            void this.networkLayer.multicast({
+                kind: "OK",
+                from: this.self.id,
+                to: fromId,
+                epoch: this.currentEpoch
+            });
             this.startElection("manual");
         }
     }
 
+    // reset election timer on OK (ack) --> someone has higher id and started new election
     private onOk(_fromId: string): void {
         if (this.electionTimer) {
             clearTimeout(this.electionTimer);
@@ -237,45 +307,48 @@ export class OperationManager extends State {
         }
     }
 
+    // Candidate leader elected --> start finalizing election
     private becomeCandidateLeader(epoch: number): void {
         this.currentEpoch = epoch;
         this.mode = "CANDIDATE";
         this.leaderId = null;
         this.voteResponses.clear();
 
-        const peers = this.networkManager.activeNodes.filter((n) => n.id !== this.self.id).map((n) => n.id);
-
-        void this.sendToMany(peers, () => ({
+        void this.networkLayer.multicast({
             kind: "VOTE_REQUEST",
             from: this.self.id,
             epoch: this.currentEpoch
-        }));
+        });
 
         this.voteTimer = setTimeout(() => {
             this.tryFinalizeLeadership();
         }, 600);
     }
 
+    // respond with last delivered sequence and last operation
     private onVoteRequest(fromId: string): void {
         const lastDeliveredSeq = this.nextSeqToDeliver - 1;
         const lastOp = lastDeliveredSeq >= 0 ? (this.logBySeq.get(lastDeliveredSeq) ?? null) : null;
 
-        const resp: VoteResponseMsg = {
+        void this.networkLayer.multicast({
             kind: "VOTE_RESPONSE",
             from: this.self.id,
+            to: fromId,
             epoch: this.currentEpoch,
             lastDeliveredSeq,
             lastDeliveredOpId: lastOp?.id ?? null
-        };
-
-        void this.sendToNode(fromId, resp);
+        });
     }
 
+    // count votes
     private onVoteResponse(msg: VoteResponseMsg): void {
         if (this.mode !== "CANDIDATE") return;
+        if (msg.to !== this.self.id) return;
         this.voteResponses.set(msg.from, msg);
     }
 
+    // finalize election if quorum reached --> start leader mode
+    // if not, start new election after timeout
     private tryFinalizeLeadership(): void {
         if (this.mode !== "CANDIDATE") return;
 
@@ -315,6 +388,7 @@ export class OperationManager extends State {
         for (const op of queued) void this.assignAndMulticast(op);
     }
 
+    // set variables when leader is announced, when follower multicast proposed operation to all nodes
     private onLeaderAnnounce(msg: LeaderAnnounceMsg): void {
         this.currentEpoch = msg.epoch;
         this.leaderId = msg.leaderId;
@@ -332,13 +406,12 @@ export class OperationManager extends State {
             if (!leader) return;
 
             for (const op of queued) {
-                const p: ProposeOperationMsg = {
+                this.networkLayer.multicast({
                     kind: "PROPOSE_OP",
                     from: this.self.id,
                     epoch: this.currentEpoch,
                     op
-                };
-                void this.sendToNode(leader, p);
+                });
             }
         }
     }
