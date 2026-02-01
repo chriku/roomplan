@@ -7,7 +7,7 @@ export abstract class NetworkLayer {
     static singleton: NetworkLayer | null = null;
 
     abstract multicast(message: ProtocolMessage): Promise<void>;
-    abstract receive(): Promise<ProtocolMessage>;
+
 }
 export class ConcreteNetworkLayer extends NetworkLayer {
     
@@ -37,14 +37,7 @@ export class ConcreteNetworkLayer extends NetworkLayer {
             });
         });
     }
-
-    async receive(): Promise<ProtocolMessage> {
-        console.log("Waiting for message...");
-        return new Promise((resolve) => {
-            this.pendingReceivers.push(resolve);
-        });
-    }
-
+    
       private setupListeners() {
         this.socket.on('error', (err) => {
             console.error(`server error:\n${err.stack}`);
