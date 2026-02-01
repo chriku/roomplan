@@ -3,6 +3,7 @@ import type { ProtocolMessage, AckMsg, NodeId } from "./messages.js";
 import { v4 as uuidv4 } from 'uuid';
 import type { Network } from "node:inspector/promises";
 import { NetworkLayer } from "./network_layer.js";
+import { OperationManager } from "./operation_manager.js";
 
 export abstract class AbstractNetworkManager {
     static singleton: AbstractNetworkManager | null = null;
@@ -36,7 +37,6 @@ export class NetworkManager extends AbstractNetworkManager {
     constructor(
         private myNodeId: NodeId,
         private senderInstance: NetworkLayer,
-        private onDeliver: (msg: ProtocolMessage) => void
     ) {
         super();
         NetworkManager.singleton = this;
@@ -102,7 +102,7 @@ export class NetworkManager extends AbstractNetworkManager {
         if (!this.deliveredToApp.has(msg.id)) {
             this.deliveredToApp.add(msg.id);
 
-            this.onDeliver(msg);
+            OperationManager.singleton?.onDeliver(msg);
 
             this.messageState.delete(msg.id);
             setTimeout(() => this.deliveredToApp.delete(msg.id), 60000);

@@ -1,7 +1,8 @@
+import { v4 as uuidv4 } from 'uuid';
 import { BookRoomOperation, CancelRoomOperation, type Operation } from "./operation.js";
 import { State } from "./state.js";
 import { NetworkLayer } from "./network_layer.js";
-import { NetworkManager } from "./network_manager.js";
+import { AbstractNetworkManager, NetworkManager } from "./network_manager.js";
 import { Node } from "./node.js";
 import type {
     AssignOperationMsg,
@@ -21,7 +22,7 @@ export class OperationManager extends State {
 
     private readonly self: Node;
     private readonly networkLayer: NetworkLayer;
-    private readonly networkManager: NetworkManager;
+    private readonly networkManager: AbstractNetworkManager;
 
     private readonly deliveredOpIds = new Set<string>();
     private readonly pendingBySeq = new Map<number, Operation>();
@@ -69,6 +70,7 @@ export class OperationManager extends State {
         }
 
         const msg: ProposeOperationMsg = {
+            id: uuidv4(),
             kind: "PROPOSE_OP",
             from: this.self.id,
             epoch: this.currentEpoch,
@@ -86,54 +88,49 @@ export class OperationManager extends State {
     }
 
     start(): void {
-        void this.receiveLoop();
         if (!this.leaderId) this.startElection("startup");
     }
 
     // receive loop that filters out false messages and acts according to the message kind
-    private async receiveLoop(): Promise<void> {
-        while (true) {
-            const msg = (await this.networkLayer.receive()) as ProtocolMessage;
+    public onDeliver(msg: ProtocolMessage): void {
+        // Ignore messages which are not directed to us
+        if ("to" in msg && msg.to !== this.self.id) return;
 
-            // Ignore messages which are not directed to us
-            if ("to" in msg && msg.to !== this.self.id) continue;
+        // Epoch handling: ignore stale, adopt newer
+        if (msg.epoch < this.currentEpoch) return;
+        if (msg.epoch > this.currentEpoch) this.adoptNewEpoch(msg.epoch);
 
-            // Epoch handling: ignore stale, adopt newer
-            if (msg.epoch < this.currentEpoch) continue;
-            if (msg.epoch > this.currentEpoch) this.adoptNewEpoch(msg.epoch);
-
-            switch (msg.kind) {
-                case "ELECTION":
-                    this.onElection(msg.from);
-                    break;
-                case "OK":
-                    this.onOk(msg.from);
-                    break;
-                case "VOTE_REQUEST":
-                    this.onVoteRequest(msg.from);
-                    break;
-                case "VOTE_RESPONSE":
-                    this.onVoteResponse(msg);
-                    break;
-                case "LEADER_ANNOUNCE":
-                    this.onLeaderAnnounce(msg);
-                    break;
-                case "PROPOSE_OP":
-                    this.onProposeOp(msg);
-                    break;
-                case "ASSIGN_OP":
-                    this.onAssignOp(msg);
-                    break;
-                case "RESEND_REQUEST":
-                    this.onResendRequest(msg);
-                    break;
-                case "PING":
-                case "ACK":
-                    // optional FD integration
-                    break;
-                default:
-                    void msg;
-            }
+        switch (msg.kind) {
+            case "ELECTION":
+                this.onElection(msg.from);
+                break;
+            case "OK":
+                this.onOk(msg.from);
+                break;
+            case "VOTE_REQUEST":
+                this.onVoteRequest(msg.from);
+                break;
+            case "VOTE_RESPONSE":
+                this.onVoteResponse(msg);
+                break;
+            case "LEADER_ANNOUNCE":
+                this.onLeaderAnnounce(msg);
+                break;
+            case "PROPOSE_OP":
+                this.onProposeOp(msg);
+                break;
+            case "ASSIGN_OP":
+                this.onAssignOp(msg);
+                break;
+            case "RESEND_REQUEST":
+                this.onResendRequest(msg);
+                break;
+            case "PING":
+            case "ACK":
+                // optional FD integration
+                break;
+            default:
+                void msg;
         }
     }
 
@@ -158,6 +155,7 @@ export class OperationManager extends State {
         op.sequenceNumber = seq;
 
         const msg: AssignOperationMsg = {
+            id: uuidv4(),
             kind: "ASSIGN_OP",
             from: this.self.id,
             leaderId: this.self.id,
@@ -185,6 +183,7 @@ export class OperationManager extends State {
 
         if (msg.seq > this.nextSeqToDeliver) {
             void this.networkLayer.multicast({
+                id: uuidv4(),
                 kind: "RESEND_REQUEST",
                 from: this.self.id,
                 epoch: this.currentEpoch,
@@ -207,6 +206,7 @@ export class OperationManager extends State {
             if (!op) continue;
 
             void this.networkLayer.multicast({
+                id: uuidv4(),
                 kind: "ASSIGN_OP",
                 from: this.self.id,
                 leaderId: this.self.id,
@@ -276,6 +276,7 @@ export class OperationManager extends State {
         const electionEpoch = this.currentEpoch + 1;
 
         this.networkLayer.multicast({
+            id: uuidv4(),
             kind: "ELECTION",
             from: this.self.id,
             epoch: electionEpoch
@@ -290,6 +291,7 @@ export class OperationManager extends State {
     private onElection(fromId: string): void {
         if (fromId < this.self.id) {
             void this.networkLayer.multicast({
+                id: uuidv4(),
                 kind: "OK",
                 from: this.self.id,
                 to: fromId,
@@ -315,7 +317,7 @@ export class OperationManager extends State {
         this.voteResponses.clear();
 
         void this.networkLayer.multicast({
-            kind: "VOTE_REQUEST",
+            kind: "VOTE_REQUEST", id: uuidv4(),
             from: this.self.id,
             epoch: this.currentEpoch
         });
@@ -331,7 +333,7 @@ export class OperationManager extends State {
         const lastOp = lastDeliveredSeq >= 0 ? (this.logBySeq.get(lastDeliveredSeq) ?? null) : null;
 
         void this.networkLayer.multicast({
-            kind: "VOTE_RESPONSE",
+            kind: "VOTE_RESPONSE", id: uuidv4(),
             from: this.self.id,
             to: fromId,
             epoch: this.currentEpoch,
@@ -370,7 +372,7 @@ export class OperationManager extends State {
         const startSeq = maxLastDelivered + 1;
 
         const announce: LeaderAnnounceMsg = {
-            kind: "LEADER_ANNOUNCE",
+            kind: "LEADER_ANNOUNCE", id: uuidv4(),
             from: this.self.id,
             epoch: this.currentEpoch,
             leaderId: this.self.id,
@@ -407,6 +409,7 @@ export class OperationManager extends State {
 
             for (const op of queued) {
                 this.networkLayer.multicast({
+                    id: uuidv4(),
                     kind: "PROPOSE_OP",
                     from: this.self.id,
                     epoch: this.currentEpoch,
