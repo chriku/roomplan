@@ -1,6 +1,8 @@
-import type { Room } from "./room.js";
+import { Room } from "./room.js";
 
-export abstract class State {
-    abstract get rooms(): Room[];
+export class State {
+    get rooms(): Room[] {
+        return Object.values(Room.rooms);
+    }
     unbookedRooms(date: Date = new Date()) { return this.rooms.filter((it) => it.isBooked(date)) };
 }
