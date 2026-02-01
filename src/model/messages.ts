@@ -15,13 +15,16 @@ export type ProtocolMessage =
     | ResendRequestMsg;
 
 export type BaseMsg<K extends string> = {
+    id: string;
     kind: K;
     from: NodeId;
     epoch: number;
 };
 
 export type PingMsg = BaseMsg<"PING">;
-export type AckMsg = BaseMsg<"ACK">;
+export type AckMsg = BaseMsg<"ACK"> & {
+    ackFor: string; 
+};
 
 export type ElectionMsg = BaseMsg<"ELECTION">;
 export type OkMsg = BaseMsg<"OK"> & {
