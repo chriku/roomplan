@@ -48,7 +48,7 @@ export abstract class OperationManager extends State {
         this.networkManager = networkManager;
     }
 
-    proposedOperation(operation: Operation): string {
+    proposeOperation(operation: Operation): string {
         operation.causedBy = this.self;
 
         if (!this.leaderId || (this.mode !== "LEADER" && this.mode !== "FOLLOWER")) {
