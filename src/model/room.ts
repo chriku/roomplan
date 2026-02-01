@@ -2,13 +2,6 @@ import { match } from 'node:assert';
 import type { Booking } from './booking.js';
 import fs from "node:fs";
 
-export abstract class RoomProvider {
-    static singleton: RoomProvider | null = null;
-
-    abstract listRooms(): Room[];
-    abstract findRoom(name: string): Room | null;
-}
-
 export class Room {
     readonly bookings: Booking[] = [];
     static readonly rooms: { [name: string]: Room } = { aula: new Room("aula"), v1: new Room("v1"), v2: new Room("v2"), s1: new Room("s1"), s2: new Room("s2") };
