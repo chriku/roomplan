@@ -12,7 +12,9 @@ import type {
     VoteResponseMsg
 } from "./messages.js";
 
-export abstract class OperationManager extends State {
+
+
+export class OperationManager extends State {
     public static singleton: OperationManager | null = null;
 
     private readonly self: Node;
@@ -50,6 +52,8 @@ export abstract class OperationManager extends State {
         this.networkManager = networkManager;
     }
 
+
+    // propose operation from user point - handles leader election. Returns outcome
     proposeOperation(operation: Operation): string {
         operation.causedBy = this.self;
 
@@ -170,11 +174,13 @@ export abstract class OperationManager extends State {
         await this.networkLayer.multicast(msg);
     }
 
+    //Propose operation from another node
     private onProposeOp(msg: ProposeOperationMsg): void {
         if (this.mode !== "LEADER") return;
         void this.assignAndMulticast(msg.op);
     }
 
+    //assign operation
     private onAssignOp(msg: AssignOperationMsg): void {
         if (!this.leaderId) return;
         if (msg.leaderId !== this.leaderId) return;
