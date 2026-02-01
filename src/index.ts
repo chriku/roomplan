@@ -1,7 +1,7 @@
 import repl from "pretty-repl";
 import { Room } from "./model/room.js";
 import { Node } from "./model/node.js";
-import * as commands from "./commands.js"
+import commands from "./commands.js"
 import { OperationManager } from "./model/operation_manager.js";
 
 const options = {

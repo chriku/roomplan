@@ -1,12 +1,19 @@
 import fs from "node:fs";
+import type { Room } from "./room.js";
+import { OperationManager } from "./operation_manager.js";
+import { BookRoomOperation } from "./operation.js";
+import { lookupTimeSlot } from "../commands.js";
 
 export class User {
-    static readonly users: User[] = (JSON.parse(fs.readFileSync("users.json", "utf8")) as string[]).map((name) => new User(name));
+    static readonly users: { [name: string]: User } = { chriku: new User("chriku"), axel: new User("axel"), schurpl: new User("schurpl") };
     static findUser(name: string): User | null {
-        const matchingUsers = this.users.filter((it) => it.name == name);
-        if (matchingUsers.length > 0)
-            return matchingUsers[0];
-        else return null;
+        if (this.users[name] != null)
+            return this.users[name];
+        else
+            return null;
     }
     constructor(readonly name: string) { }
+    bookRoom(room: Room, slot: number) {
+        OperationManager.singleton!.proposedOperation(new BookRoomOperation(lookupTimeSlot(slot), room, this));
+    }
 }
