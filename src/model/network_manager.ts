@@ -24,6 +24,7 @@ interface MessageTracker {
 export class NetworkManager extends AbstractNetworkManager {
     private messageState = new Map<string, MessageTracker>();
     private deliveredToApp = new Set<string>();
+    private lastSeen = new Map<NodeId, number>();
 
     private _knownNodes: Node[] = [];
     private _activeNodes: Node[] = [];
@@ -49,8 +50,47 @@ export class NetworkManager extends AbstractNetworkManager {
         super();
         this._knownNodes.push(new Node(myNodeId));
         console.log(`Start operation as ${myNodeId}`)
-        this.broadcastReliably({ id: uuidv4(), kind: "PING", from: myNodeId, epoch: null });
+        this.startHeartbeatLoops();
+        this.startHeartbeatLoops()
     }
+
+    private startHeartbeatLoops() {
+        setInterval(() => {
+            this.broadcastReliably({ 
+                id: uuidv4(), 
+                kind: "PING", 
+                from: this.myNodeId, 
+                epoch: null 
+            });
+        }, 2000);
+
+
+        setInterval(() => {
+            this.checkNodeHealth();
+        }, 1000);
+    }
+
+    private checkNodeHealth() {
+        const now = Date.now();
+        const timeout = 7000; 
+
+        const previouslyActiveCount = this._activeNodes.length;
+
+
+        this._activeNodes = this._knownNodes.filter(node => {
+            if (node.id === this.myNodeId) return true; 
+            
+            const lastContact = this.lastSeen.get(node.id) || 0;
+            return (now - lastContact) < timeout;
+        });
+
+        if (this._activeNodes.length !== previouslyActiveCount) {
+            console.log(`View Change: ${this._activeNodes.length} Nodes active.`);
+            //TODO View changes application should be notified, stop processing requests sync elect new leader and resume operation
+        }
+    }
+
+
 
     public broadcastReliably(msg: ProtocolMessage) {
         this.startTracking(msg);
@@ -68,9 +108,13 @@ export class NetworkManager extends AbstractNetworkManager {
 
     public handleIncoming(incomingMsg: ProtocolMessage) {
         this.ensureNode(incomingMsg.from);
+        this.markNodeAsAlive(incomingMsg.from);
         if (incomingMsg.kind === "ACK") {
             if (incomingMsg.from !== this.myNodeId)
                 this.processAck(incomingMsg as AckMsg);
+            return;
+        }
+        if (incomingMsg.kind === "PING") {
             return;
         }
 
@@ -78,6 +122,17 @@ export class NetworkManager extends AbstractNetworkManager {
             this.startTracking(incomingMsg);
         }
         this.sendAck(incomingMsg);
+    }
+
+    private markNodeAsAlive(nodeId: NodeId) {
+        this.lastSeen.set(nodeId, Date.now());
+        
+        const isActive = this._activeNodes.some(n => n.id === nodeId);
+        if (!isActive) {
+            const node = this.ensureNode(nodeId);
+            this._activeNodes.push(node);
+            console.log(`Node ${nodeId} is back online!`);
+        }
     }
 
     private startTracking(msg: ProtocolMessage) {
