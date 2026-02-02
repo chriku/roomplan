@@ -34,7 +34,7 @@ export class NetworkManager extends AbstractNetworkManager {
     }
 
     get activeNodes(): Node[] {
-        return this._knownNodes; // TODO: Remove when state tracking
+       // return this._knownNodes; // TODO: Remove when state tracking
         return this._activeNodes;
     }
 
