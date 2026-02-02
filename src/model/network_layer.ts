@@ -10,7 +10,7 @@ export abstract class AbstractNetworkLayer {
 
 }
 export class NetworkLayer extends AbstractNetworkLayer {
-    
+
     private socket: dgram.Socket;
     private multicastAddress: string;
     private multicastPort: number;
@@ -18,10 +18,9 @@ export class NetworkLayer extends AbstractNetworkLayer {
 
     constructor() {
         super();
-        NetworkLayer.singleton = this;
         this.multicastAddress = process.env.MULTICAST_ADDRESS || '224.0.0.124';
         this.multicastPort = parseInt(process.env.MULTICAST_PORT || '41234', 10);
-        
+
         this.socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
         this.setupListeners();
         this.bind();
@@ -29,6 +28,7 @@ export class NetworkLayer extends AbstractNetworkLayer {
     }
 
     async multicast(message: ProtocolMessage): Promise<void> {
+        console.log(`send: ${message}`);
         const data = JSON.stringify(message);
         return new Promise((resolve, reject) => {
             this.socket.send(data, this.multicastPort, this.multicastAddress, (err) => {
@@ -38,7 +38,7 @@ export class NetworkLayer extends AbstractNetworkLayer {
         });
     }
 
-      private setupListeners() {
+    private setupListeners() {
         this.socket.on('error', (err) => {
             console.error(`server error:\n${err.stack}`);
             this.socket.close();
@@ -48,9 +48,9 @@ export class NetworkLayer extends AbstractNetworkLayer {
             console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
             try {
                 const parsed: ProtocolMessage = JSON.parse(msg.toString());
-                
-               // ADD Massage to network Manager 
-               
+
+                // ADD Massage to network Manager 
+
             } catch (e) {
                 console.error("Failed to parse message", e);
             }

@@ -10,6 +10,7 @@ export abstract class AbstractNetworkManager {
 
     abstract get knownNodes(): Node[];
     abstract get activeNodes(): Node[];
+    abstract get selfNode(): Node;
 }
 
 
@@ -33,6 +34,11 @@ export class NetworkManager extends AbstractNetworkManager {
     get activeNodes(): Node[] {
         return this._activeNodes;
     }
+
+    get selfNode(): Node {
+        return this.knownNodes.filter((it) => it.id == this.myNodeId)[0];
+    }
+
     //TODO Add view of active nodes and node 
     constructor(
         private myNodeId: NodeId,

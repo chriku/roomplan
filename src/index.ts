@@ -3,12 +3,16 @@ import { Room } from "./model/room.js";
 import { Node } from "./model/node.js";
 import commands from "./commands.js"
 import { OperationManager } from "./model/operation_manager.js";
+import { NetworkManager } from "./model/network_manager.js";
+import { NetworkLayer } from "./model/network_layer.js";
 
 const options = {
     prompt: '→ '
 };
 
-OperationManager.singleton = new OperationManager(new Node("TODO"));//TODO: better declaration
+NetworkLayer.singleton = new NetworkLayer();
+NetworkManager.singleton = new NetworkManager("TODO", NetworkLayer.singleton);
+OperationManager.singleton = new OperationManager(NetworkManager.singleton!.selfNode);//TODO: better declaration
 
 const replInstance = repl.start(options);
 // replInstance.context.netLayerTest = () => new NetworkLayer(); <== commented out until @schurpl merged
