@@ -14,6 +14,9 @@ const options = {
 NetworkLayer.singleton = new NetworkLayer();
 NetworkManager.singleton = new NetworkManager(uuidv4(), NetworkLayer.singleton);
 OperationManager.singleton = new OperationManager(NetworkManager.singleton!.selfNode);//TODO: better declaration
+setTimeout(() => {
+    OperationManager.singleton!.start();
+}, 3500);
 
 const replInstance = repl.start(options);
 // replInstance.context.netLayerTest = () => new NetworkLayer(); <== commented out until @schurpl merged

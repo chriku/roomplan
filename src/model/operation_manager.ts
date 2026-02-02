@@ -15,6 +15,7 @@ import type {
 } from "./messages.js";
 import { Room } from "./room.js";
 import { Booking, BookingStatus } from "./booking.js";
+import { stringify } from 'node:querystring';
 
 
 export class OperationManager extends State {
@@ -93,13 +94,22 @@ export class OperationManager extends State {
 
     // receive loop that filters out false messages and acts according to the message kind
     public onDeliver(msg: ProtocolMessage): void {
+        console.log(`onDeliver ${JSON.stringify(msg)} while in ${this.currentEpoch}`);
+
         // Ignore messages which are not directed to us
         if ("to" in msg && msg.to !== this.self.id) return;
 
-        // Epoch handling: ignore stale, adopt newer
-        if ((msg.epoch != null) && (msg.epoch < this.currentEpoch)) return;
-        if ((msg.epoch != null) && (msg.epoch > this.currentEpoch)) this.adoptNewEpoch(msg.epoch!);
-
+        if (msg.from !== this.self.id) {
+            // Epoch handling: ignore stale, adopt newer
+            if ((msg.epoch != null) && (msg.epoch < this.currentEpoch)) {
+                if ((msg.kind == "ELECTION") || (msg.kind == "LEADER_ANNOUNCE") || (msg.kind == "VOTE_REQUEST") || (msg.kind == "VOTE_RESPONSE")) {
+                    console.log(`Kill Election due to ${msg.epoch}<${this.currentEpoch}`);
+                    this.killElection();
+                }
+                return;
+            }
+            if ((msg.epoch != null) && (msg.epoch > this.currentEpoch)) this.adoptNewEpoch(msg.epoch!);
+        }
         switch (msg.kind) {
             case "ELECTION":
                 this.onElection(msg.from);
@@ -143,8 +153,8 @@ export class OperationManager extends State {
     }
 
     private clearTimers(): void {
-        if (this.electionTimer) clearTimeout(this.electionTimer);
-        if (this.voteTimer) clearTimeout(this.voteTimer);
+        if (this.electionTimer != null) clearTimeout(this.electionTimer);
+        if (this.voteTimer != null) clearTimeout(this.voteTimer);
         this.electionTimer = null;
         this.voteTimer = null;
     }
@@ -284,26 +294,40 @@ export class OperationManager extends State {
 
         this.electionTimer = setTimeout(() => {
             this.becomeCandidateLeader(electionEpoch);
-        }, 600);
+        }, 3000);
     }
 
     // accept election with "Ok" if our id is higher than elected and start a new election.
     private onElection(fromId: string): void {
         if (fromId < this.self.id) {
-            void this.networkLayer.multicast({
+            this.networkLayer.multicast({
                 id: uuidv4(),
                 kind: "OK",
                 from: this.self.id,
                 to: fromId,
                 epoch: this.currentEpoch
             });
+            this.currentEpoch = this.currentEpoch + 1;//TODO: Check if this increment is valid
             this.startElection("manual");
         }
     }
 
+    private killElection(): void {
+        this.networkLayer.multicast({
+            id: uuidv4(),
+            kind: "OK",
+            from: this.self.id,
+            to: null,
+            epoch: this.currentEpoch
+        });
+        this.clearTimers();
+        this.currentEpoch = this.currentEpoch + 1;//TODO: Check if this increment is valid
+        this.startElection("manual");
+    }
+
     // reset election timer on OK (ack) --> someone has higher id and started new election
     private onOk(_fromId: string): void {
-        if (this.electionTimer) {
+        if (this.electionTimer != null) {
             clearTimeout(this.electionTimer);
             this.electionTimer = null;
         }
@@ -324,7 +348,7 @@ export class OperationManager extends State {
 
         this.voteTimer = setTimeout(() => {
             this.tryFinalizeLeadership();
-        }, 600);
+        }, 3000);
     }
 
     // respond with last delivered sequence and last operation
@@ -398,6 +422,7 @@ export class OperationManager extends State {
         this.mode = msg.leaderId === this.self.id ? "LEADER" : "FOLLOWER";
         this.clearTimers();
 
+        console.log(`onLeaderAnnounce ${this.mode} `);
         if (this.mode === "LEADER") {
             this.nextSeqToAssign = msg.startSeq;
         }

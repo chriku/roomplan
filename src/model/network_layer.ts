@@ -29,7 +29,8 @@ export class NetworkLayer extends AbstractNetworkLayer {
     }
 
     async multicast(message: ProtocolMessage): Promise<void> {
-        console.log(`send: ${JSON.stringify(message)}`);
+        if (message.kind != "ACK")
+            console.log(`send: ${JSON.stringify(message)}`);
         const data = JSON.stringify(message);
         return new Promise((resolve, reject) => {
             this.socket.send(data, this.multicastPort, this.multicastAddress, (err) => {
@@ -46,7 +47,7 @@ export class NetworkLayer extends AbstractNetworkLayer {
         });
 
         this.socket.on('message', (msg, rinfo) => {
-            console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
+            //console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
             try {
                 const parsed: ProtocolMessage = JSON.parse(msg.toString());
                 NetworkManager.singleton!.handleIncoming(parsed);

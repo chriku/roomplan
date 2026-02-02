@@ -28,7 +28,7 @@ export type AckMsg = BaseMsg<"ACK"> & {
 
 export type ElectionMsg = BaseMsg<"ELECTION">;
 export type OkMsg = BaseMsg<"OK"> & {
-    to: NodeId;
+    to: NodeId | null;
 };
 
 export type VoteRequestMsg = BaseMsg<"VOTE_REQUEST">;

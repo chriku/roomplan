@@ -33,6 +33,7 @@ export class NetworkManager extends AbstractNetworkManager {
     }
 
     get activeNodes(): Node[] {
+        return this._knownNodes; // TODO: Remove when state tracking
         return this._activeNodes;
     }
 
@@ -47,7 +48,7 @@ export class NetworkManager extends AbstractNetworkManager {
     ) {
         super();
         this._knownNodes.push(new Node(myNodeId));
-        console.log(`ME ${myNodeId}`)
+        console.log(`Start operation as ${myNodeId}`)
         this.broadcastReliably({ id: uuidv4(), kind: "PING", from: myNodeId, epoch: null });
     }
 
