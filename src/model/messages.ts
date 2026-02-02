@@ -18,12 +18,12 @@ export type BaseMsg<K extends string> = {
     id: string;
     kind: K;
     from: NodeId;
-    epoch: number;
+    epoch: number | null;
 };
 
 export type PingMsg = BaseMsg<"PING">;
 export type AckMsg = BaseMsg<"ACK"> & {
-    ackFor: string; 
+    ackFor: string;
 };
 
 export type ElectionMsg = BaseMsg<"ELECTION">;

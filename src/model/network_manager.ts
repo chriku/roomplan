@@ -11,6 +11,7 @@ export abstract class AbstractNetworkManager {
     abstract get knownNodes(): Node[];
     abstract get activeNodes(): Node[];
     abstract get selfNode(): Node;
+    public abstract handleIncoming(incomingMsg: ProtocolMessage): void;
 }
 
 
@@ -45,7 +46,9 @@ export class NetworkManager extends AbstractNetworkManager {
         private senderInstance: NetworkLayer,
     ) {
         super();
-        NetworkManager.singleton = this;
+        this._knownNodes.push(new Node(myNodeId));
+        console.log(`ME ${myNodeId}`)
+        this.broadcastReliably({ id: uuidv4(), kind: "PING", from: myNodeId, epoch: null });
     }
 
     public broadcastReliably(msg: ProtocolMessage) {
@@ -53,16 +56,27 @@ export class NetworkManager extends AbstractNetworkManager {
         this.senderInstance.multicast(msg);
     }
 
+    private ensureNode(nodeId: string): Node {
+        const node = this._knownNodes.find((it) => it.id == nodeId);
+        if (node != null) return node;
+        const n = new Node(nodeId);
+        console.log(`Heard of therefore unknown node: ${nodeId}`)
+        this._knownNodes.push(n);
+        return n;
+    }
+
     public handleIncoming(incomingMsg: ProtocolMessage) {
+        this.ensureNode(incomingMsg.from);
         if (incomingMsg.kind === "ACK") {
-            this.processAck(incomingMsg as AckMsg);
+            if (incomingMsg.from !== this.myNodeId)
+                this.processAck(incomingMsg as AckMsg);
             return;
         }
 
         if (!this.messageState.has(incomingMsg.id)) {
             this.startTracking(incomingMsg);
-            this.sendAck(incomingMsg);
         }
+        this.sendAck(incomingMsg);
     }
 
     private startTracking(msg: ProtocolMessage) {

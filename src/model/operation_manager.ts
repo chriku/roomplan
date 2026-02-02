@@ -97,8 +97,8 @@ export class OperationManager extends State {
         if ("to" in msg && msg.to !== this.self.id) return;
 
         // Epoch handling: ignore stale, adopt newer
-        if (msg.epoch < this.currentEpoch) return;
-        if (msg.epoch > this.currentEpoch) this.adoptNewEpoch(msg.epoch);
+        if ((msg.epoch != null) && (msg.epoch < this.currentEpoch)) return;
+        if ((msg.epoch != null) && (msg.epoch > this.currentEpoch)) this.adoptNewEpoch(msg.epoch!);
 
         switch (msg.kind) {
             case "ELECTION":
@@ -392,7 +392,8 @@ export class OperationManager extends State {
 
     // set variables when leader is announced, when follower multicast proposed operation to all nodes
     private onLeaderAnnounce(msg: LeaderAnnounceMsg): void {
-        this.currentEpoch = msg.epoch;
+        if (msg.epoch != null)
+            this.currentEpoch = msg.epoch;
         this.leaderId = msg.leaderId;
         this.mode = msg.leaderId === this.self.id ? "LEADER" : "FOLLOWER";
         this.clearTimers();

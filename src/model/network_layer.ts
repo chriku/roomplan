@@ -1,5 +1,6 @@
 import type { ProtocolMessage } from "./messages.js";
 import * as dgram from 'node:dgram';
+import { NetworkManager } from "./network_manager.js";
 
 export type Message = { type: string };
 export type FischMessage = { type: "fisch", data: string };
@@ -28,7 +29,7 @@ export class NetworkLayer extends AbstractNetworkLayer {
     }
 
     async multicast(message: ProtocolMessage): Promise<void> {
-        console.log(`send: ${message}`);
+        console.log(`send: ${JSON.stringify(message)}`);
         const data = JSON.stringify(message);
         return new Promise((resolve, reject) => {
             this.socket.send(data, this.multicastPort, this.multicastAddress, (err) => {
@@ -48,8 +49,9 @@ export class NetworkLayer extends AbstractNetworkLayer {
             console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
             try {
                 const parsed: ProtocolMessage = JSON.parse(msg.toString());
+                NetworkManager.singleton!.handleIncoming(parsed);
 
-                // ADD Massage to network Manager 
+                // TODO: Check if I did "ADD Massage to network Manager" right
 
             } catch (e) {
                 console.error("Failed to parse message", e);

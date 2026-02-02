@@ -5,5 +5,5 @@ import { OperationManager } from './operation_manager.js';
 export class Node {
     get isLeader(): boolean { return this == OperationManager.singleton?.currentLeader(); }
     readonly causedOperations: Operation[] = [];
-    constructor(readonly nickname: string, readonly id: string = uuidv4()) { }
+    constructor(readonly id: string = uuidv4()) { }
 }
