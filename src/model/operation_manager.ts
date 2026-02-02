@@ -15,7 +15,6 @@ import type {
 } from "./messages.js";
 import { Room } from "./room.js";
 import { Booking, BookingStatus } from "./booking.js";
-import { stringify } from 'node:querystring';
 import { User } from './user.js';
 
 
@@ -42,6 +41,7 @@ export class OperationManager extends State {
 
     private electionTimer: ReturnType<typeof setTimeout> | null = null;
     private voteTimer: ReturnType<typeof setTimeout> | null = null;
+    private discoverLeaderTimer: ReturnType<typeof setTimeout> | null = null;
     private readonly voteResponses = new Map<string, VoteResponseMsg>();
 
     constructor(self: Node) {
@@ -90,7 +90,11 @@ export class OperationManager extends State {
     }
 
     start(): void {
-        if (!this.leaderId) this.startElection("startup");
+        this.discoverLeader();
+
+        this.discoverLeaderTimer = setTimeout(() => {
+            if (!this.leaderId) this.startElection("startup");
+        }, 3000);
     }
 
     // receive loop that filters out false messages and acts according to the message kind
@@ -102,14 +106,19 @@ export class OperationManager extends State {
 
         if (msg.from !== this.self.id) {
             // Epoch handling: ignore stale, adopt newer
-            if ((msg.epoch != null) && (msg.epoch < this.currentEpoch)) {
-                if ((msg.kind == "ELECTION") || (msg.kind == "LEADER_ANNOUNCE") || (msg.kind == "VOTE_REQUEST") || (msg.kind == "VOTE_RESPONSE")) {
+            if (msg.epoch != null && msg.epoch < this.currentEpoch) {
+                if (
+                    msg.kind == "ELECTION" ||
+                    msg.kind == "LEADER_ANNOUNCE" ||
+                    msg.kind == "VOTE_REQUEST" ||
+                    msg.kind == "VOTE_RESPONSE"
+                ) {
                     console.log(`Kill Election due to ${msg.epoch}<${this.currentEpoch}`);
                     this.killElection();
                 }
                 return;
             }
-            if ((msg.epoch != null) && (msg.epoch > this.currentEpoch)) this.adoptNewEpoch(msg.epoch!);
+            if (msg.epoch != null && msg.epoch > this.currentEpoch) this.adoptNewEpoch(msg.epoch!);
         }
         switch (msg.kind) {
             case "ELECTION":
@@ -137,6 +146,8 @@ export class OperationManager extends State {
                 this.onResendRequest(msg);
                 break;
             case "PING":
+                this.onPing();
+                break;
             case "ACK":
                 // optional FD integration
                 break;
@@ -156,6 +167,7 @@ export class OperationManager extends State {
     private clearTimers(): void {
         if (this.electionTimer != null) clearTimeout(this.electionTimer);
         if (this.voteTimer != null) clearTimeout(this.voteTimer);
+        if (this.discoverLeaderTimer) clearTimeout(this.discoverLeaderTimer);
         this.electionTimer = null;
         this.voteTimer = null;
     }
@@ -191,6 +203,7 @@ export class OperationManager extends State {
         if (msg.leaderId !== this.leaderId) return;
         if (msg.from !== this.leaderId) return;
         if (this.deliveredOpIds.has(msg.op.id)) return;
+        if (this.pendingBySeq.has(msg.seq)) return;
 
         if (msg.seq > this.nextSeqToDeliver) {
             void this.networkLayer.multicast({
@@ -226,7 +239,31 @@ export class OperationManager extends State {
                 op
             });
         }
-    };
+    }
+
+    private discoverLeader(): void {
+        void this.networkLayer.multicast({
+            id: uuidv4(),
+            kind: "PING",
+            from: this.self.id,
+            epoch: this.currentEpoch
+        })
+        console.log("Pinged all nodes to discover leader");
+    }
+
+    private onPing(): void {
+        if (this.mode !== "LEADER") return;
+
+        void this.networkLayer.multicast({
+            id: uuidv4(),
+            kind: "LEADER_ANNOUNCE",
+            from: this.self.id,
+            epoch: this.currentEpoch,
+            leaderId: this.self.id,
+            lastSeq: this.nextSeqToDeliver - 1,
+            startSeq: this.nextSeqToAssign
+        })
+    }
 
     private tryDeliverInOrder(): void {
         while (this.pendingBySeq.has(this.nextSeqToDeliver)) {
@@ -241,10 +278,10 @@ export class OperationManager extends State {
             switch (op.kind) {
                 case "BOOK_ROOM":
                     this.applyBooking(op as BookRoomOperation);
-                    return;
+                    break;
                 case "CANCEL_ROOM":
                     this.applyCancel(op as CancelRoomOperation);
-                    return;
+                    break;
             }
         }
     }
@@ -272,7 +309,7 @@ export class OperationManager extends State {
         const oper = op as CancelRoomOperation;
 
         for (const room of Object.values(Room.rooms)) {
-            const booking = room.bookings.find((b) => b.id === oper.id);
+            const booking = room.bookings.find((b) => b.id === oper.booking.id);
             if (booking) {
                 booking.status = BookingStatus.CANCELLED;
                 return;
@@ -313,7 +350,7 @@ export class OperationManager extends State {
                 to: fromId,
                 epoch: this.currentEpoch
             });
-            this.currentEpoch = this.currentEpoch + 1;//TODO: Check if this increment is valid
+            this.currentEpoch = this.currentEpoch + 1; //TODO: Check if this increment is valid
             this.startElection("manual");
         }
     }
@@ -327,7 +364,7 @@ export class OperationManager extends State {
             epoch: this.currentEpoch
         });
         this.clearTimers();
-        this.currentEpoch = this.currentEpoch + 1;//TODO: Check if this increment is valid
+        this.currentEpoch = this.currentEpoch + 1; //TODO: Check if this increment is valid
         this.startElection("manual");
     }
 
@@ -347,7 +384,8 @@ export class OperationManager extends State {
         this.voteResponses.clear();
 
         void this.networkLayer.multicast({
-            kind: "VOTE_REQUEST", id: uuidv4(),
+            kind: "VOTE_REQUEST",
+            id: uuidv4(),
             from: this.self.id,
             epoch: this.currentEpoch
         });
@@ -363,7 +401,8 @@ export class OperationManager extends State {
         const lastOp = lastDeliveredSeq >= 0 ? (this.logBySeq.get(lastDeliveredSeq) ?? null) : null;
 
         void this.networkLayer.multicast({
-            kind: "VOTE_RESPONSE", id: uuidv4(),
+            kind: "VOTE_RESPONSE",
+            id: uuidv4(),
             from: this.self.id,
             to: fromId,
             epoch: this.currentEpoch,
@@ -402,10 +441,12 @@ export class OperationManager extends State {
         const startSeq = maxLastDelivered + 1;
 
         const announce: LeaderAnnounceMsg = {
-            kind: "LEADER_ANNOUNCE", id: uuidv4(),
+            kind: "LEADER_ANNOUNCE",
+            id: uuidv4(),
             from: this.self.id,
             epoch: this.currentEpoch,
             leaderId: this.self.id,
+            lastSeq: this.nextSeqToDeliver - 1,
             startSeq
         };
 
@@ -422,8 +463,7 @@ export class OperationManager extends State {
 
     // set variables when leader is announced, when follower multicast proposed operation to all nodes
     private onLeaderAnnounce(msg: LeaderAnnounceMsg): void {
-        if (msg.epoch != null)
-            this.currentEpoch = msg.epoch;
+        if (msg.epoch != null) this.currentEpoch = msg.epoch;
         this.leaderId = msg.leaderId;
         this.mode = msg.leaderId === this.self.id ? "LEADER" : "FOLLOWER";
         this.clearTimers();
@@ -434,7 +474,22 @@ export class OperationManager extends State {
         }
 
         if (this.mode === "FOLLOWER") {
+            const leaderLast = msg.lastSeq;
+            const myNext = this.nextSeqToDeliver;
             const queued = this.queuedProposals.splice(0, this.queuedProposals.length);
+
+            if (this.leaderId && leaderLast >= myNext) {
+                void this.networkLayer.multicast({
+                    id: uuidv4(),
+                    kind: "RESEND_REQUEST",
+                    from: this.self.id,
+                    epoch: this.currentEpoch,
+                    leaderId: this.leaderId,
+                    fromSeq: myNext,
+                    toSeq: leaderLast
+                });
+                console.log("Resend queued operations");
+            }
 
             const leader = this.leaderId;
             if (!leader) return;

@@ -41,6 +41,7 @@ export type VoteResponseMsg = BaseMsg<"VOTE_RESPONSE"> & {
 export type LeaderAnnounceMsg = BaseMsg<"LEADER_ANNOUNCE"> & {
     leaderId: NodeId;
     startSeq: number;
+    lastSeq: number;
 };
 
 export type ProposeOperationMsg = BaseMsg<"PROPOSE_OP"> & {
