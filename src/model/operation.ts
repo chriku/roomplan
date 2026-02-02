@@ -12,7 +12,7 @@ export class Operation {
         public sequenceNumber: number = -1,
         readonly timestamp: Date = new Date(),
         readonly id: string = uuidv4()
-    ) {}
+    ) { }
 }
 
 export class CancelRoomOperation extends Operation {
@@ -29,7 +29,7 @@ export class CancelRoomOperation extends Operation {
 
 export class BookRoomOperation extends Operation {
     override readonly kind = "BOOK_ROOM" as const;
-    constructor(readonly time: DateRange, readonly room: Room, readonly user: User, id: string = uuidv4(), sequenceNumber: number = -1, timestamp: Date = new Date()) {
+    constructor(readonly time: DateRange, readonly room: string, readonly user: string, id: string = uuidv4(), sequenceNumber: number = -1, timestamp: Date = new Date()) {
         super(sequenceNumber, timestamp, id);
     }
 }

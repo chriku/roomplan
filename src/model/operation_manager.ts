@@ -16,6 +16,7 @@ import type {
 import { Room } from "./room.js";
 import { Booking, BookingStatus } from "./booking.js";
 import { stringify } from 'node:querystring';
+import { User } from './user.js';
 
 
 export class OperationManager extends State {
@@ -250,14 +251,19 @@ export class OperationManager extends State {
 
     private applyBooking(op: BookRoomOperation) {
         const oper = op as BookRoomOperation;
-        const room = Room.findRoom(oper.room.name);
+        const room = Room.findRoom(oper.room);
+        const user = User.findUser(oper.user);
 
         if (!room) {
-            console.log("Room does not exist: " + oper.room.name);
+            console.log("Room does not exist: " + oper.room);
+            return;
+        }
+        if (!user) {
+            console.log("Room does not exist: " + oper.user);
             return;
         }
 
-        const booking = new Booking(room, oper.time, oper.user, BookingStatus.BOOKED, oper.id);
+        const booking = new Booking(room, oper.time, user, BookingStatus.BOOKED, oper.id);
         room.bookings.push(booking);
         console.log("Room successfully booked: " + room.name);
     }

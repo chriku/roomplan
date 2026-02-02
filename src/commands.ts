@@ -4,9 +4,6 @@ import { OperationManager } from "./model/operation_manager.js";
 import { Room } from "./model/room.js";
 import { User } from "./model/user.js";
 
-export function lookupTimeSlot(slot: number): DateRange {
-    return new DateRange(new Date(2026, 2, 11, slot, 0, 0), new Date(2026, 2, 11, slot, 59, 59));
-}
 
 export function deleteBooking(uuid: string) {
     for (const room of Object.values(Room.rooms)) {
