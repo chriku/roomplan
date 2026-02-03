@@ -16,6 +16,7 @@ import type {
 import { Room } from "./room.js";
 import { Booking, BookingStatus } from "./booking.js";
 import { User } from './user.js';
+import { DateRange } from "./date_range.js";
 
 
 export class OperationManager extends State {
@@ -322,23 +323,24 @@ export class OperationManager extends State {
     private applyBooking(op: BookRoomOperation) {
         const oper = op as BookRoomOperation;
         const room = Room.findRoom(oper.room);
-        const user = User.findUser(oper.user);
+        const user = User.findUser(oper.user)
+        const time = DateRange.hydrate(oper.time); // hydrate object
 
         if (!room) {
             console.log("Room does not exist: " + oper.room);
             return;
         }
         if (!user) {
-            console.log("Room does not exist: " + oper.user);
+            console.log("User does not exist: " + oper.user);
             return;
         }
 
-        if (room.hasOverlappingBooking(oper.time)) {
+        if (room.hasOverlappingBooking(time)) {
             console.log(`Booking rejected (room already booked): ${room.name} from ${oper.time.startTime} to ${oper.time.endTime}`);
             return;
         }
 
-        const booking = new Booking(room, oper.time, user, BookingStatus.BOOKED, oper.id);
+        const booking = new Booking(room, time, user, BookingStatus.BOOKED, oper.id);
         room.bookings.push(booking);
         console.log("Room successfully booked: " + room.name);
     }
