@@ -1,6 +1,7 @@
 import { match } from 'node:assert';
 import type { Booking } from './booking.js';
 import fs from "node:fs";
+import type { DateRange } from "./date_range.js";
 
 export class Room {
     readonly bookings: Booking[] = [];
@@ -13,6 +14,10 @@ export class Room {
     }
     constructor(readonly name: string) { }
     isBooked(date: Date = new Date()) { return this.bookings.filter((it) => it.affects(date)).length > 0; }
+
+    hasOverlappingBooking(time: DateRange): boolean {
+        return this.bookings.some((booking) => booking.valid && booking.overlaps(time));
+    }
 
     listBookings() {
         console.log("Bookings for " + this.name);

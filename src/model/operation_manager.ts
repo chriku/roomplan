@@ -37,8 +37,6 @@ export class OperationManager extends State {
     private leaderId: NodeId | null = null;
     private mode: "FOLLOWER" | "LEADER" | "CANDIDATE" = "FOLLOWER";
 
-    // ist der state von den räumen gespeichert ??
-
     private electionTimer: ReturnType<typeof setTimeout> | null = null;
     private voteTimer: ReturnType<typeof setTimeout> | null = null;
     private discoverLeaderTimer: ReturnType<typeof setTimeout> | null = null;
@@ -332,6 +330,11 @@ export class OperationManager extends State {
         }
         if (!user) {
             console.log("Room does not exist: " + oper.user);
+            return;
+        }
+
+        if (room.hasOverlappingBooking(oper.time)) {
+            console.log(`Booking rejected (room already booked): ${room.name} from ${oper.time.startTime} to ${oper.time.endTime}`);
             return;
         }
 
