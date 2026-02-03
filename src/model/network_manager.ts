@@ -114,11 +114,8 @@ export class NetworkManager extends AbstractNetworkManager {
                 this.processAck(incomingMsg as AckMsg);
             return;
         }
-        if (incomingMsg.kind === "PING") {
-            return;
-        }
 
-        if (!this.messageState.has(incomingMsg.id)) {
+        if (!this.messageState.has(incomingMsg.id) && incomingMsg.kind !== "PING") {
             this.startTracking(incomingMsg);
         }
         this.sendAck(incomingMsg);
