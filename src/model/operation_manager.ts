@@ -355,7 +355,7 @@ export class OperationManager extends State {
         }
     }
 
-    private killElection(): void {
+    public killElection(): void {
         this.networkLayer.multicast({
             id: uuidv4(),
             kind: "OK",

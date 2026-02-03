@@ -84,7 +84,7 @@ export class NetworkManager extends AbstractNetworkManager {
 
         if (this._activeNodes.length !== previouslyActiveCount) {
             console.log(`View Change: ${this._activeNodes.length} Nodes active.`);
-            //TODO View changes application should be notified, stop processing requests sync elect new leader and resume operation
+            OperationManager.singleton?.killElection()
         }
     }
 
