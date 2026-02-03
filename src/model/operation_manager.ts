@@ -39,6 +39,9 @@ export class OperationManager extends State {
 
     private readonly queuedOperations: Operation[] = [];
 
+    // ist der state von den räumen gespeichert ??
+    //
+
     private electionTimer: ReturnType<typeof setTimeout> | null = null;
     private voteTimer: ReturnType<typeof setTimeout> | null = null;
     private discoverLeaderTimer: ReturnType<typeof setTimeout> | null = null;
@@ -145,9 +148,9 @@ export class OperationManager extends State {
             case "RESEND_REQUEST":
                 this.onResendRequest(msg);
                 break;
-            case "PING":
-                this.onPing();
-                break;
+            //case "PING":
+            //    this.onPing();
+            //    break;
             case "ACK":
                 // optional FD integration
                 break;
@@ -254,15 +257,16 @@ export class OperationManager extends State {
     private onPing(): void {
         if (this.mode !== "LEADER") return;
 
-        void this.networkLayer.multicast({
-            id: uuidv4(),
-            kind: "LEADER_ANNOUNCE",
-            from: this.self.id,
-            epoch: this.currentEpoch,
-            leaderId: this.self.id,
-            lastSeq: this.nextSeqToDeliver - 1,
-            startSeq: this.nextSeqToAssign
-        })
+        //todo change to new message type
+        //void this.networkLayer.multicast({
+        //    id: uuidv4(),
+        //    kind: "LEADER_ANNOUNCE",
+        //    from: this.self.id,
+        //    epoch: this.currentEpoch,
+        //    leaderId: this.self.id,
+        //    lastSeq: this.nextSeqToDeliver - 1,
+        //    startSeq: this.nextSeqToAssign
+        //})
     }
 
     private tryDeliverInOrder(): void {
