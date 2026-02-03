@@ -34,7 +34,6 @@ export class NetworkManager extends AbstractNetworkManager {
     }
 
     get activeNodes(): Node[] {
-       // return this._knownNodes; // TODO: Remove when state tracking
         return this._activeNodes;
     }
 
@@ -42,7 +41,6 @@ export class NetworkManager extends AbstractNetworkManager {
         return this.knownNodes.filter((it) => it.id == this.myNodeId)[0];
     }
 
-    //TODO Add view of active nodes and node 
     constructor(
         private myNodeId: NodeId,
         private senderInstance: NetworkLayer,
