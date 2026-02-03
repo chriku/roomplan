@@ -5,7 +5,7 @@ import { NetworkLayer } from "./network_layer.js";
 import { AbstractNetworkManager, NetworkManager } from "./network_manager.js";
 import { Node } from "./node.js";
 import type {
-    AssignOperationMsg,
+    AssignOperationMsg, CatchUpMsg, CatchUpResponse,
     LeaderAnnounceMsg,
     NodeId,
     ProposeOperationMsg,
@@ -37,10 +37,7 @@ export class OperationManager extends State {
     private leaderId: NodeId | null = null;
     private mode: "FOLLOWER" | "LEADER" | "CANDIDATE" = "FOLLOWER";
 
-    private readonly queuedOperations: Operation[] = [];
-
     // ist der state von den räumen gespeichert ??
-    //
 
     private electionTimer: ReturnType<typeof setTimeout> | null = null;
     private voteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -65,7 +62,7 @@ export class OperationManager extends State {
         operation.causedBy = this.self;
 
         if (!this.leaderId || (this.mode !== "LEADER" && this.mode !== "FOLLOWER")) {
-            this.queuedOperations.push(operation);
+            this.queuedProposals.push(operation);
             return "QUEUED_NO_LEADER";
         }
 
@@ -93,7 +90,7 @@ export class OperationManager extends State {
     }
 
     start(): void {
-        this.discoverLeader();
+        this.catchUp();
 
         this.discoverLeaderTimer = setTimeout(() => {
             if (!this.leaderId) this.startElection("startup");
@@ -148,9 +145,12 @@ export class OperationManager extends State {
             case "RESEND_REQUEST":
                 this.onResendRequest(msg);
                 break;
-            //case "PING":
-            //    this.onPing();
-            //    break;
+            case "CATCH_UP":
+                this.onCatchUp(msg);
+                break;
+            case "CATCH_UP_RESPONSE":
+                this.onCatchUpResponse(msg);
+                break;
             case "ACK":
                 // optional FD integration
                 break;
@@ -244,29 +244,60 @@ export class OperationManager extends State {
         }
     }
 
-    private discoverLeader(): void {
+    private catchUp(): void {
         void this.networkLayer.multicast({
             id: uuidv4(),
-            kind: "PING",
+            kind: "CATCH_UP",
             from: this.self.id,
             epoch: this.currentEpoch
-        })
-        console.log("Pinged all nodes to discover leader");
+        });
+        console.log("");
     }
 
-    private onPing(): void {
+    private onCatchUp(msg: CatchUpMsg): void {
         if (this.mode !== "LEADER") return;
 
-        //todo change to new message type
-        //void this.networkLayer.multicast({
-        //    id: uuidv4(),
-        //    kind: "LEADER_ANNOUNCE",
-        //    from: this.self.id,
-        //    epoch: this.currentEpoch,
-        //    leaderId: this.self.id,
-        //    lastSeq: this.nextSeqToDeliver - 1,
-        //    startSeq: this.nextSeqToAssign
-        //})
+        const lastSeq = this.nextSeqToAssign - 1;
+
+        void this.networkLayer.multicast({
+            id: uuidv4(),
+            kind: "CATCH_UP_RESPONSE",
+            from: this.self.id,
+            to: msg.from,
+            epoch: this.currentEpoch,
+            leaderId: this.self.id,
+            lastSeq,
+            nextSeqToAssign: this.nextSeqToAssign
+        });
+    }
+
+    private onCatchUpResponse(msg: CatchUpResponse): void {
+        if (msg.to !== this.self.id) return;
+
+        this.currentEpoch = msg.epoch ?? this.currentEpoch;
+        this.leaderId = msg.leaderId;
+        this.mode = msg.leaderId === this.self.id ? "LEADER" : "FOLLOWER";
+        this.clearTimers();
+
+        if (this.mode === "LEADER") {
+            this.nextSeqToAssign = Math.max(this.nextSeqToAssign, msg.nextSeqToAssign);
+            return;
+        }
+
+        const haveLast = this.nextSeqToDeliver - 1;
+        const needUpTo = msg.lastSeq;
+
+        if (needUpTo > haveLast && this.leaderId) {
+            void this.networkLayer.multicast({
+                id: uuidv4(),
+                kind: "RESEND_REQUEST",
+                from: this.self.id,
+                epoch: this.currentEpoch,
+                leaderId: this.leaderId,
+                fromSeq: haveLast + 1,
+                toSeq: needUpTo
+            });
+        }
     }
 
     private tryDeliverInOrder(): void {
@@ -478,22 +509,7 @@ export class OperationManager extends State {
         }
 
         if (this.mode === "FOLLOWER") {
-            const leaderLast = msg.lastSeq;
-            const myNext = this.nextSeqToDeliver;
             const queued = this.queuedProposals.splice(0, this.queuedProposals.length);
-
-            if (this.leaderId && leaderLast >= myNext) {
-                void this.networkLayer.multicast({
-                    id: uuidv4(),
-                    kind: "RESEND_REQUEST",
-                    from: this.self.id,
-                    epoch: this.currentEpoch,
-                    leaderId: this.leaderId,
-                    fromSeq: myNext,
-                    toSeq: leaderLast
-                });
-                console.log("Resend queued operations");
-            }
 
             const leader = this.leaderId;
             if (!leader) return;
