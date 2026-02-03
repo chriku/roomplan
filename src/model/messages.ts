@@ -12,7 +12,9 @@ export type ProtocolMessage =
     | LeaderAnnounceMsg
     | ProposeOperationMsg
     | AssignOperationMsg
-    | ResendRequestMsg;
+    | ResendRequestMsg
+    | CatchUpMsg
+    | CatchUpResponse;
 
 export type BaseMsg<K extends string> = {
     id: string;
@@ -22,6 +24,7 @@ export type BaseMsg<K extends string> = {
 };
 
 export type PingMsg = BaseMsg<"PING">;
+export type CatchUpMsg = BaseMsg<"CATCH_UP">;
 export type AckMsg = BaseMsg<"ACK"> & {
     ackFor: string;
 };
@@ -58,4 +61,11 @@ export type ResendRequestMsg = BaseMsg<"RESEND_REQUEST"> & {
     leaderId: NodeId;
     fromSeq: number;
     toSeq: number;
+};
+
+export type CatchUpResponse = BaseMsg<"CATCH_UP_RESPONSE"> & {
+    leaderId: NodeId;
+    lastSeq: number;
+    nextSeqToAssign: number;
+    to: NodeId;
 };
