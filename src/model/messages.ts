@@ -14,7 +14,9 @@ export type ProtocolMessage =
     | AssignOperationMsg
     | ResendRequestMsg
     | CatchUpMsg
-    | CatchUpResponse;
+    | CatchUpResponse
+    | LogRequestMsg
+    | LogResponseMsg;
 
 export type BaseMsg<K extends string> = {
     id: string;
@@ -68,4 +70,15 @@ export type CatchUpResponse = BaseMsg<"CATCH_UP_RESPONSE"> & {
     lastSeq: number;
     nextSeqToAssign: number;
     to: NodeId;
+};
+
+export type LogRequestMsg = BaseMsg<"LOG_REQUEST"> & {
+    to: NodeId;
+    fromSeq: number;
+    toSeq: number;
+};
+
+export type LogResponseMsg = BaseMsg<"LOG_RESPONSE"> & {
+    to: NodeId;
+    entries: { seq: number; op: Operation }[];
 };

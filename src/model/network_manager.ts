@@ -84,7 +84,9 @@ export class NetworkManager extends AbstractNetworkManager {
 
         if (this._activeNodes.length !== previouslyActiveCount) {
             console.log(`View Change: ${this._activeNodes.length} Nodes active.`);
-            OperationManager.singleton?.killElection()
+
+                OperationManager.singleton?.killElection();
+
         }
     }
 
