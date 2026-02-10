@@ -62,6 +62,8 @@ export class NetworkLayer extends AbstractNetworkLayer {
         this.socket.on('listening', () => {
             const address = this.socket.address();
             console.log(`server listening ${address.address}:${address.port}`);
+            this.socket.setBroadcast(true)
+            this.socket.setMulticastTTL(128);
             this.socket.addMembership(this.multicastAddress);
         });
     }

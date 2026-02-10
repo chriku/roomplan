@@ -7,6 +7,8 @@ import { Node } from "./node.js";
 import type {
     AssignOperationMsg, CatchUpMsg, CatchUpResponse,
     LeaderAnnounceMsg,
+    LogRequestMsg,
+    LogResponseMsg,
     NodeId,
     ProposeOperationMsg,
     ProtocolMessage,
@@ -37,6 +39,13 @@ export class OperationManager extends State {
 
     private leaderId: NodeId | null = null;
     private mode: "FOLLOWER" | "LEADER" | "CANDIDATE" = "FOLLOWER";
+
+    private pendingLeadership: {
+        epoch: number;
+        startSeq: number;
+        requiredUpTo: number;
+        donorId: NodeId;
+    } | null = null;
 
     private electionTimer: ReturnType<typeof setTimeout> | null = null;
     private voteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -150,6 +159,12 @@ export class OperationManager extends State {
             case "CATCH_UP_RESPONSE":
                 this.onCatchUpResponse(msg);
                 break;
+            case "LOG_REQUEST":
+                this.onLogRequest(msg);
+                break;
+            case "LOG_RESPONSE":
+                this.onLogResponse(msg);
+                break;
             case "ACK":
                 // optional FD integration
                 break;
@@ -172,6 +187,20 @@ export class OperationManager extends State {
         if (this.discoverLeaderTimer) clearTimeout(this.discoverLeaderTimer);
         this.electionTimer = null;
         this.voteTimer = null;
+    }
+
+    private requestLogFrom(nodeId: NodeId, fromSeq: number, toSeq: number): void {
+        if (fromSeq > toSeq) return;
+        const req: LogRequestMsg = {
+            id: uuidv4(),
+            kind: "LOG_REQUEST",
+            from: this.self.id,
+            to: nodeId,
+            epoch: this.currentEpoch,
+            fromSeq,
+            toSeq
+        };
+        void this.networkLayer.multicast(req);
     }
 
     // --- Sequencer (leader) ---
@@ -296,6 +325,54 @@ export class OperationManager extends State {
                 fromSeq: haveLast + 1,
                 toSeq: needUpTo
             });
+        }
+    }
+
+    private onLogRequest(msg: LogRequestMsg): void {
+        if (msg.to !== this.self.id) return;
+
+        const entries: { seq: number; op: Operation }[] = [];
+        for (let seq = msg.fromSeq; seq <= msg.toSeq; seq++) {
+            const op = this.logBySeq.get(seq);
+            if (op) entries.push({ seq, op });
+        }
+
+        const res: LogResponseMsg = {
+            id: uuidv4(),
+            kind: "LOG_RESPONSE",
+            from: this.self.id,
+            to: msg.from,
+            epoch: this.currentEpoch,
+            entries
+        };
+
+        void this.networkLayer.multicast(res);
+    }
+
+    private onLogResponse(msg: LogResponseMsg): void {
+        if (msg.to !== this.self.id) return;
+
+        for (const entry of msg.entries) {
+            if (this.deliveredOpIds.has(entry.op.id)) continue;
+            if (this.pendingBySeq.has(entry.seq)) continue;
+            if (entry.seq < this.nextSeqToDeliver) continue;
+            this.pendingBySeq.set(entry.seq, entry.op);
+        }
+
+        this.tryDeliverInOrder();
+
+        if (this.pendingLeadership) {
+            const haveLast = this.nextSeqToDeliver - 1;
+            if (haveLast >= this.pendingLeadership.requiredUpTo) {
+                this.finalizeLeadershipAnnounce(this.pendingLeadership.startSeq);
+                this.pendingLeadership = null;
+            } else {
+                this.requestLogFrom(
+                    this.pendingLeadership.donorId,
+                    haveLast + 1,
+                    this.pendingLeadership.requiredUpTo
+                );
+            }
         }
     }
 
@@ -473,13 +550,33 @@ export class OperationManager extends State {
         }
 
         let maxLastDelivered = this.nextSeqToDeliver - 1;
+        let donorId: NodeId | null = null;
 
         for (const r of this.voteResponses.values()) {
-            if (r.lastDeliveredSeq > maxLastDelivered) maxLastDelivered = r.lastDeliveredSeq;
+            if (r.lastDeliveredSeq > maxLastDelivered) {
+                maxLastDelivered = r.lastDeliveredSeq;
+                donorId = r.from;
+            }
         }
 
         const startSeq = maxLastDelivered + 1;
 
+        const localLast = this.nextSeqToDeliver - 1;
+        if (maxLastDelivered > localLast && donorId) {
+            this.pendingLeadership = {
+                epoch: this.currentEpoch,
+                startSeq,
+                requiredUpTo: maxLastDelivered,
+                donorId
+            };
+            this.requestLogFrom(donorId, localLast + 1, maxLastDelivered);
+            return;
+        }
+
+        this.finalizeLeadershipAnnounce(startSeq);
+    }
+
+    private finalizeLeadershipAnnounce(startSeq: number): void {
         const announce: LeaderAnnounceMsg = {
             kind: "LEADER_ANNOUNCE",
             id: uuidv4(),
@@ -518,6 +615,19 @@ export class OperationManager extends State {
 
             const leader = this.leaderId;
             if (!leader) return;
+
+            const haveLast = this.nextSeqToDeliver - 1;
+            if (msg.lastSeq > haveLast) {
+                void this.networkLayer.multicast({
+                    id: uuidv4(),
+                    kind: "RESEND_REQUEST",
+                    from: this.self.id,
+                    epoch: this.currentEpoch,
+                    leaderId: leader,
+                    fromSeq: haveLast + 1,
+                    toSeq: msg.lastSeq
+                });
+            }
 
             for (const op of queued) {
                 this.networkLayer.multicast({
