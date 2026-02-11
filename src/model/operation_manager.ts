@@ -476,7 +476,7 @@ cookie={};
 
     public killElection(): void {
         this.clearTimers();
-if(this.mode != "CANDIDATE"){
+if(this.mode == "LEADER"){
         this.networkLayer.multicast({
             id: uuidv4(),
             kind: "OK",
