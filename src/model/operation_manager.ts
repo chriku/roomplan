@@ -472,6 +472,8 @@ export class OperationManager extends State {
         }
     }
 
+cookie={};
+
     public killElection(): void {
         this.clearTimers();
 if(this.mode != "CANDIDATE"){
@@ -483,8 +485,12 @@ if(this.mode != "CANDIDATE"){
             epoch: this.currentEpoch
         });
         // this.currentEpoch = this.currentEpoch + 1; //TODO: Check if this increment is valid
+let c={};
+this.cookie=c;
 setTimeout(()=>{
+if(c==this.cookie){
         this.startElection("manual");
+}
 },Math.random()*1000);
 }
     }
