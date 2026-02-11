@@ -473,6 +473,8 @@ export class OperationManager extends State {
     }
 
     public killElection(): void {
+        this.clearTimers();
+if(this.mode != "CANDIDATE"){
         this.networkLayer.multicast({
             id: uuidv4(),
             kind: "OK",
@@ -480,9 +482,11 @@ export class OperationManager extends State {
             to: null,
             epoch: this.currentEpoch
         });
-        this.clearTimers();
-        this.currentEpoch = this.currentEpoch + 1; //TODO: Check if this increment is valid
+        // this.currentEpoch = this.currentEpoch + 1; //TODO: Check if this increment is valid
+setTimeout(()=>{
         this.startElection("manual");
+},Math.random()*1000);
+}
     }
 
     // reset election timer on OK (ack) --> someone has higher id and started new election

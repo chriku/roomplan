@@ -21,4 +21,4 @@ export function deleteBooking(uuid: string) {
 
 export const rooms = Room.rooms;
 export const users = User.users;
-export default { ...rooms, ...users };
+export default { ...rooms, ...users, deleteBooking };
